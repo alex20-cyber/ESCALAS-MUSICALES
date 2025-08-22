@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explorador Interactivo de Escalas Musicales</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Harmony -->
+    <!-- Application Structure Plan: He diseñado una estructura de panel de control temático con una barra de navegación lateral fija (que se convierte en un menú desplegable en móviles) para una exploración no lineal. El usuario selecciona una categoría de escala (Fundamentales, Modos, etc.) y luego una escala específica. El área de contenido principal se actualiza dinámicamente para mostrar una explicación, su fórmula, un visualizador de teclado de piano interactivo y un gráfico de radar comparativo. Esta estructura se eligió para transformar el aprendizaje pasivo (leer un documento) en una experiencia activa y atractiva, permitiendo al usuario centrarse en una escala a la vez y comparar fácilmente sus características sonoras y teóricas. -->
+    <!-- Visualization & Content Choices: 
+        - Introducción: Texto estático para contextualizar. Meta: Informar. Método: HTML.
+        - Navegación: Lista HTML con JS para cambiar de vista. Meta: Organizar. Método: JS DOM manipulation.
+        - Fórmula de Escala: Diagrama visual con HTML/CSS. Meta: Informar. Método: Flexbox.
+        - Teclado de Piano Interactivo: Visualizador de notas. Meta: Involucrar/Educar. Método: HTML/CSS/JS para resaltar las teclas según la tónica y la escala seleccionada.
+        - Gráfico de Radar de 'Personalidad': Compara el "carácter" de las escalas (brillo, tensión, etc.). Meta: Comparar/Analizar. Método: Chart.js Canvas. Permite una comprensión más profunda y cualitativa de las diferencias entre escalas.
+        - Contenido textual: Extraído de la guía y presentado en fragmentos digeribles. Meta: Informar. Método: HTML actualizado con JS.
+        - Justificación: Esta combinación de texto, visualizadores interactivos y gráficos de datos convierte un documento de texto plano en una herramienta de aprendizaje multisensorial, mejorando la retención y la comprensión. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F5F5F4; /* stone-100 */
+            color: #44403C; /* stone-700 */
+        }
+        .piano-key {
+            border: 1px solid #A8A29E; /* stone-400 */
+            border-radius: 0 0 5px 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .white-key {
+            width: 10%;
+            height: 180px;
+            background-color: white;
+        }
+        .black-key {
+            width: 6%;
+            height: 110px;
+            background-color: #292524; /* stone-800 */
+            position: absolute;
+            margin-left: -3%;
+            z-index: 10;
+        }
+        .black-key.c-sharp { margin-left: 7%; }
+        .black-key.d-sharp { margin-left: 17%; }
+        .black-key.f-sharp { margin-left: 37%; }
+        .black-key.g-sharp { margin-left: 47%; }
+        .black-key.a-sharp { margin-left: 57%; }
+        .key-highlight {
+            background-color: #FBBF24; /* amber-400 */
+        }
+        .key-root {
+            background-color: #DC2626; /* red-600 */
+        }
+        .nav-link.active {
+            background-color: #E7E5E4; /* stone-200 */
+            font-weight: 600;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div id="app" class="flex flex-col md:flex-row min-h-screen">
+        
+        <nav id="sidebar" class="w-full md:w-64 bg-white border-r border-stone-200 p-4 md:p-6 flex-shrink-0">
+            <h1 class="text-2xl font-bold text-stone-800 mb-6">Guía de Escalas</h1>
+            <div id="nav-content"></div>
+        </nav>
+
+        <main class="flex-1 p-4 sm:p-6 md:p-8 lg:p-10">
+            <div id="content-area">
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const scalesData = {
+            'introduccion': {
+                title: 'Bienvenido al Explorador de Escalas',
+                content: `
+                    <p class="text-lg mb-4">Las escalas musicales son el ADN de la música. Son secuencias de notas que forman la base de melodías y armonías. Esta herramienta interactiva está diseñada para ayudarte a visualizar, comprender y comparar las escalas más importantes de la música occidental.</p>
+                    <p class="mb-4">Usa la navegación de la izquierda para explorar las diferentes categorías. Para cada escala, podrás:</p>
+                    <ul class="list-disc list-inside mb-4 space-y-2">
+                        <li>Leer una descripción de su sonido y uso.</li>
+                        <li>Ver su fórmula de tonos y semitonos.</li>
+                        <li>Seleccionar una nota tónica y ver la escala en un teclado de piano.</li>
+                        <li>Comparar su "personalidad" con otras escalas en un gráfico de radar.</li>
+                    </ul>
+                    <p class="font-semibold">¡Comienza seleccionando una escala para explorar!</p>
+                `
+            },
+            'mayor': {
+                title: 'Escala Mayor',
+                category: 'Fundamentales',
+                formula: ['T', 'T', 'S', 'T', 'T', 'T', 'S'],
+                intervals: [0, 2, 4, 5, 7, 9, 11],
+                description: 'La escala más importante de la música occidental. Su sonido es brillante, alegre y estable. Se utiliza en la gran mayoría de la música pop, rock, clásica y folk.',
+                songs: ["'Let It Be' - The Beatles", "'Don't Stop Believin'' - Journey"],
+                mood: { 'Brillo': 9, 'Tristeza': 1, 'Tensión': 2, 'Estabilidad': 9, 'Complejidad': 3, 'Exotismo': 1 }
+            },
+            'menor-natural': {
+                title: 'Escala Menor Natural',
+                category: 'Fundamentales',
+                formula: ['T', 'S', 'T', 'T', 'S', 'T', 'T'],
+                intervals: [0, 2, 3, 5, 7, 8, 10],
+                description: 'Tiene un sonido más sombrío, melancólico o introspectivo que la escala mayor. Es la base para muchas baladas y canciones con un tono más serio.',
+                songs: ["'House of the Rising Sun' - The Animals", "'Losing My Religion' - R.E.M."],
+                mood: { 'Brillo': 3, 'Tristeza': 8, 'Tensión': 4, 'Estabilidad': 7, 'Complejidad': 4, 'Exotismo': 2 }
+            },
+            'menor-armonica': {
+                title: 'Escala Menor Armónica',
+                category: 'Fundamentales',
+                formula: ['T', 'S', 'T', 'T', 'S', 'T+S', 'S'],
+                intervals: [0, 2, 3, 5, 7, 8, 11],
+                description: 'Similar a la menor natural, pero con la séptima nota elevada un semitono. Esto crea un sonido distintivo, con más tensión y un toque exótico o neoclásico, muy usado en música clásica, tango y metal.',
+                songs: ["'Stairway to Heaven' (solo) - Led Zeppelin", "Música de Bach y Vivaldi"],
+                mood: { 'Brillo': 4, 'Tristeza': 7, 'Tensión': 8, 'Estabilidad': 5, 'Complejidad': 7, 'Exotismo': 8 }
+            },
+            'pentatonica-menor': {
+                title: 'Escala Pentatónica Menor',
+                category: 'Rock, Blues y Jazz',
+                formula: ['T+S', 'T', 'T', 'T+S', 'T'],
+                intervals: [0, 3, 5, 7, 10],
+                description: 'Compuesta por solo cinco notas, es la escala por excelencia del blues, rock y muchos solos de guitarra. Es fácil de usar para improvisar y tiene un sonido crudo y expresivo.',
+                songs: ["'Smoke on the Water' - Deep Purple", "Casi cualquier solo de B.B. King"],
+                mood: { 'Brillo': 3, 'Tristeza': 6, 'Tensión': 5, 'Estabilidad': 8, 'Complejidad': 2, 'Exotismo': 4 }
+            },
+            'dorio': {
+                title: 'Modo Dórico',
+                category: 'Modos Griegos',
+                formula: ['T', 'S', 'T', 'T', 'T', 'S', 'T'],
+                intervals: [0, 2, 3, 5, 7, 9, 10],
+                description: 'Es un modo menor con una sexta mayor. Suena melancólico pero con un toque de esperanza o brillo. Muy popular en jazz, funk y folk.',
+                songs: ["'Oye Como Va' - Santana", "'Moondance' - Van Morrison"],
+                mood: { 'Brillo': 5, 'Tristeza': 6, 'Tensión': 4, 'Estabilidad': 7, 'Complejidad': 6, 'Exotismo': 5 }
+            },
+            'mixolidio': {
+                title: 'Modo Mixolidio',
+                category: 'Modos Griegos',
+                formula: ['T', 'T', 'S', 'T', 'T', 'S', 'T'],
+                intervals: [0, 2, 4, 5, 7, 9, 10],
+                description: 'Es un modo mayor con una séptima menor. Es la escala dominante del blues y el rock and roll. Suena alegre y enérgico, pero con una "actitud" blusera.',
+                songs: ["'Sweet Child O\' Mine' - Guns N\' Roses", "'Royals' - Lorde"],
+                mood: { 'Brillo': 8, 'Tristeza': 2, 'Tensión': 6, 'Estabilidad': 7, 'Complejidad': 5, 'Exotismo': 4 }
+            },
+             'hungara-menor': {
+                title: 'Escala Húngara Menor',
+                category: 'Escalas Exóticas',
+                formula: ['T', 'S', 'T+S', 'S', 'S', 'T+S', 'S'],
+                intervals: [0, 2, 3, 6, 7, 8, 11],
+                description: 'También conocida como escala gitana, tiene un sonido muy dramático y exótico debido a sus dos intervalos de tono y medio. Evoca música de Europa del Este, flamenca y del Medio Oriente.',
+                songs: ["Usada frecuentemente en música de Liszt y Brahms", "Metal neoclásico (Yngwie Malmsteen)"],
+                mood: { 'Brillo': 4, 'Tristeza': 6, 'Tensión': 9, 'Estabilidad': 3, 'Complejidad': 9, 'Exotismo': 10 }
+            },
+        };
+
+        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        let currentScaleId = 'introduccion';
+        let currentRootNoteIndex = 0; // C
+        let moodChart;
+
+        const appState = {
+            activeScale: 'introduccion',
+            rootNoteIndex: 0 // C
+        };
+
+        function renderNav() {
+            const navContent = document.getElementById('nav-content');
+            const categories = {};
+            Object.keys(scalesData).forEach(key => {
+                if (scalesData[key].category) {
+                    if (!categories[scalesData[key].category]) {
+                        categories[scalesData[key].category] = [];
+                    }
+                    categories[scalesData[key].category].push({ id: key, title: scalesData[key].title });
+                }
+            });
+
+            let navHTML = '';
+            for (const category in categories) {
+                navHTML += `<h3 class="text-sm font-semibold text-stone-500 uppercase tracking-wider mt-6 mb-2">${category}</h3>`;
+                navHTML += `<ul class="space-y-1">`;
+                categories[category].forEach(scale => {
+                    navHTML += `<li><a href="#" id="nav-${scale.id}" class="nav-link block px-3 py-2 rounded-md text-stone-700 hover:bg-stone-200 transition-colors">${scale.title}</a></li>`;
+                });
+                navHTML += `</ul>`;
+            }
+            navContent.innerHTML = navHTML;
+        }
+
+        function renderContent(scaleId) {
+            appState.activeScale = scaleId;
+            const scale = scalesData[scaleId];
+            const contentArea = document.getElementById('content-area');
+
+            if (scaleId === 'introduccion') {
+                contentArea.innerHTML = `
+                    <div class="bg-white p-8 rounded-lg shadow-sm">
+                        <h2 class="text-3xl font-bold text-stone-800 mb-4">${scale.title}</h2>
+                        ${scale.content}
+                    </div>
+                `;
+                return;
+            }
+
+            let formulaHTML = scale.formula.map(f => `<div class="px-3 py-1 text-sm rounded ${f === 'S' ? 'bg-amber-200 text-amber-800' : f === 'T' ? 'bg-sky-200 text-sky-800' : 'bg-red-200 text-red-800'}">${f}</div>`).join('');
+
+            contentArea.innerHTML = `
+                <div class="bg-white p-6 md:p-8 rounded-lg shadow-sm">
+                    <h2 class="text-4xl font-bold text-stone-800 mb-2">${scale.title}</h2>
+                    <p class="text-stone-600 mb-6">${scale.description}</p>
+
+                    <div class="mb-8">
+                        <h3 class="text-xl font-semibold mb-3">Fórmula de Intervalos</h3>
+                        <div class="flex flex-wrap gap-2 items-center">${formulaHTML}</div>
+                    </div>
+
+                    <div class="mb-8">
+                        <h3 class="text-xl font-semibold mb-3">Visualizador Interactivo</h3>
+                        <div class="flex items-center gap-4 mb-4">
+                            <label for="root-note-select" class="font-medium">Tónica:</label>
+                            <select id="root-note-select" class="p-2 border border-stone-300 rounded-md bg-white">
+                                ${notes.map((note, index) => `<option value="${index}" ${index === appState.rootNoteIndex ? 'selected' : ''}>${note}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div id="piano-container" class="relative w-full h-[180px]">${renderPiano()}</div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div>
+                            <h3 class="text-xl font-semibold mb-3">Personalidad de la Escala</h3>
+                            <div class="chart-container">
+                                <canvas id="moodChart"></canvas>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold mb-3">Ejemplos en Canciones</h3>
+                            <ul class="list-disc list-inside space-y-2 text-stone-600">
+                                ${scale.songs.map(song => `<li>${song}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+            renderMoodChart();
+            updatePiano();
+        }
+
+        function renderPiano() {
+            return `
+                <div class="piano-key white-key" data-note-index="0"></div>
+                <div class="piano-key white-key" data-note-index="2"></div>
+                <div class="piano-key white-key" data-note-index="4"></div>
+                <div class="piano-key white-key" data-note-index="5"></div>
+                <div class="piano-key white-key" data-note-index="7"></div>
+                <div class="piano-key white-key" data-note-index="9"></div>
+                <div class="piano-key white-key" data-note-index="11"></div>
+                <div class="piano-key black-key c-sharp" data-note-index="1"></div>
+                <div class="piano-key black-key d-sharp" data-note-index="3"></div>
+                <div class="piano-key black-key f-sharp" data-note-index="6"></div>
+                <div class="piano-key black-key g-sharp" data-note-index="8"></div>
+                <div class="piano-key black-key a-sharp" data-note-index="10"></div>
+            `;
+        }
+
+        function updatePiano() {
+            const scale = scalesData[appState.activeScale];
+            if (!scale || !scale.intervals) return;
+
+            document.querySelectorAll('.piano-key').forEach(key => {
+                key.classList.remove('key-highlight', 'key-root');
+            });
+
+            const scaleNoteIndices = scale.intervals.map(interval => (appState.rootNoteIndex + interval) % 12);
+            
+            scaleNoteIndices.forEach((noteIndex, i) => {
+                const key = document.querySelector(`.piano-key[data-note-index="${noteIndex}"]`);
+                if (key) {
+                    if (i === 0) {
+                        key.classList.add('key-root');
+                    } else {
+                        key.classList.add('key-highlight');
+                    }
+                }
+            });
+        }
+
+        function renderMoodChart() {
+            const scale = scalesData[appState.activeScale];
+            if (!scale || !scale.mood) return;
+
+            const ctx = document.getElementById('moodChart').getContext('2d');
+            const labels = Object.keys(scale.mood);
+            const data = Object.values(scale.mood);
+
+            if (moodChart) {
+                moodChart.destroy();
+            }
+
+            moodChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: scale.title,
+                        data: data,
+                        fill: true,
+                        backgroundColor: 'rgba(251, 191, 36, 0.2)',
+                        borderColor: 'rgb(251, 191, 36)',
+                        pointBackgroundColor: 'rgb(251, 191, 36)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgb(251, 191, 36)'
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    elements: {
+                        line: {
+                            borderWidth: 3
+                        }
+                    },
+                    scales: {
+                        r: {
+                            angleLines: {
+                                color: '#E7E5E4' // stone-200
+                            },
+                            grid: {
+                                color: '#E7E5E4' // stone-200
+                            },
+                            pointLabels: {
+                                font: {
+                                    size: 12
+                                },
+                                color: '#57534E' // stone-600
+                            },
+                            ticks: {
+                                backdropColor: '#F5F5F4', // stone-100
+                                color: '#78716C', // stone-500
+                                stepSize: 2
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 10
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateActiveNavLink() {
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            const activeLink = document.getElementById(`nav-${appState.activeScale}`);
+            if (activeLink) {
+                activeLink.classList.add('active');
+            }
+        }
+
+        function handleEvents() {
+            document.body.addEventListener('click', e => {
+                if (e.target.matches('.nav-link')) {
+                    e.preventDefault();
+                    const scaleId = e.target.id.replace('nav-', '');
+                    renderContent(scaleId);
+                    updateActiveNavLink();
+                }
+            });
+
+            document.body.addEventListener('change', e => {
+                if (e.target.id === 'root-note-select') {
+                    appState.rootNoteIndex = parseInt(e.target.value);
+                    updatePiano();
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderNav();
+            renderContent('introduccion');
+            handleEvents();
+        });
+    </script>
+</body>
+</html>
