@@ -20,30 +20,42 @@
             border-radius: 0 0 5px 5px;
             cursor: pointer;
             transition: background-color 0.2s;
+            position: relative;
         }
         .white-key {
-            width: 10%;
+            width: 14%;
             height: 180px;
             background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .black-key {
-            width: 6%;
+            width: 8%;
             height: 110px;
             background-color: #292524; /* stone-800 */
             position: absolute;
-            margin-left: -3%;
+            margin-left: -4%;
             z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
-        .black-key.c-sharp { margin-left: 7%; }
-        .black-key.d-sharp { margin-left: 17%; }
-        .black-key.f-sharp { margin-left: 37%; }
-        .black-key.g-sharp { margin-left: 47%; }
-        .black-key.a-sharp { margin-left: 57%; }
+        .black-key.c-sharp { margin-left: 10%; }
+        .black-key.d-sharp { margin-left: 21%; }
+        .black-key.f-sharp { margin-left: 45%; }
+        .black-key.g-sharp { margin-left: 56%; }
+        .black-key.a-sharp { margin-left: 67%; }
         .key-highlight {
             background-color: #FBBF24; /* amber-400 */
         }
         .key-root {
             background-color: #DC2626; /* red-600 */
+        }
+        .nav-link {
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            transition: background-color 0.2s, font-weight 0.2s;
+        }
+        .nav-link:hover {
+            background-color: #E7E5E4; /* stone-200 */
         }
         .nav-link.active {
             background-color: #E7E5E4; /* stone-200 */
@@ -73,18 +85,220 @@
             <div id="nav-content"></div>
         </nav>
 
-        <main class="flex-1 p-4 sm:p-6 md:p-8 lg:p-10">
+        <main class="flex-1 p-4 sm:p-6 md:p-8 lg:p-10 overflow-auto">
             <div id="content-area">
             </div>
         </main>
     </div>
 
     <script>
-        /* --- AQUÍ ESTÁ TU CÓDIGO DE LA APP ORIGINAL --- */
-        /* No lo borro ni lo modifico */
-    </script>
+        // Definiciones de notas y escalas
+        const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-    <!-- 🚀 Script de Adsterra agregado -->
+        const SCALES = {
+            'major': {
+                name: 'Mayor',
+                intervals: [0, 2, 4, 5, 7, 9, 11],
+                description: 'La escala mayor es una de las escalas más comunes en la música occidental y a menudo se describe como "alegre" o "brillante".'
+            },
+            'minor': {
+                name: 'Menor Natural',
+                intervals: [0, 2, 3, 5, 7, 8, 10],
+                description: 'La escala menor natural es la más fundamental de las escalas menores y a menudo se asocia con un sonido "melancólico" o "triste".'
+            },
+            'harmonic_minor': {
+                name: 'Menor Armónica',
+                intervals: [0, 2, 3, 5, 7, 8, 11],
+                description: 'La escala menor armónica es similar a la natural, pero con el séptimo grado elevado, creando un sonido distintivo e "intenso".'
+            },
+            'pentatonic': {
+                name: 'Pentatónica Mayor',
+                intervals: [0, 2, 4, 7, 9],
+                description: 'La escala pentatónica mayor tiene cinco notas y se utiliza ampliamente en la música folclórica, el blues y el rock por su sonido "abierto" y fácil de tocar.'
+            },
+            'blues': {
+                name: 'Blues',
+                intervals: [0, 3, 5, 6, 7, 10],
+                description: 'La escala de blues es una escala pentatónica menor con una "nota azul" añadida, creando el sonido característico del blues.'
+            },
+            'chromatic': {
+                name: 'Cromática',
+                intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+                description: 'La escala cromática incluye las 12 notas de la octava, separadas por semitonos. Es la base de toda la música tonal.'
+            }
+        };
+
+        let currentScaleId = 'major';
+        let currentRootIndex = 0;
+        let myChart = null;
+
+        // Función para renderizar la barra lateral
+        function renderSidebar() {
+            const navContent = document.getElementById('nav-content');
+            navContent.innerHTML = '';
+            for (const id in SCALES) {
+                const scale = SCALES[id];
+                const link = document.createElement('a');
+                link.href = '#';
+                link.textContent = scale.name;
+                link.classList.add('block', 'nav-link', 'text-stone-700', 'hover:bg-stone-200');
+                if (id === currentScaleId) {
+                    link.classList.add('active');
+                }
+                link.onclick = (e) => {
+                    e.preventDefault();
+                    currentScaleId = id;
+                    updateUI();
+                };
+                navContent.appendChild(link);
+            }
+        }
+
+        // Función para renderizar el área de contenido
+        function renderContent() {
+            const contentArea = document.getElementById('content-area');
+            const scale = SCALES[currentScaleId];
+            const rootNote = NOTES[currentRootIndex];
+            
+            // Calcular las notas de la escala
+            const scaleNotesIndices = scale.intervals.map(interval => (currentRootIndex + interval) % 12);
+            const scaleNotes = scaleNotesIndices.map(index => NOTES[index]);
+
+            contentArea.innerHTML = `
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-stone-800 mb-2">${scale.name} de ${rootNote}</h2>
+                    <p class="text-stone-600 mb-4">${scale.description}</p>
+                    <div class="flex flex-wrap items-center gap-2 text-lg text-stone-800">
+                        <span class="font-bold">Notas:</span>
+                        ${scaleNotes.map(note => `<span class="bg-stone-200 rounded-full px-3 py-1 text-sm font-semibold">${note}</span>`).join('')}
+                    </div>
+                </div>
+                
+                <!-- Área del teclado del piano -->
+                <div class="flex flex-wrap items-end justify-center bg-stone-200 rounded-lg p-4 mb-8 relative">
+                    <!-- Teclas blancas -->
+                    ${NOTES.filter(note => !note.includes('#')).map((note, index) => `
+                        <div class="white-key piano-key flex-1 flex items-end justify-center text-sm font-bold text-stone-600 p-2" data-note-index="${NOTES.indexOf(note)}">
+                            ${note}
+                        </div>
+                    `).join('')}
+                    <!-- Teclas negras -->
+                    <div class="black-key c-sharp piano-key" data-note-index="1"></div>
+                    <div class="black-key d-sharp piano-key" data-note-index="3"></div>
+                    <div class="black-key f-sharp piano-key" data-note-index="6"></div>
+                    <div class="black-key g-sharp piano-key" data-note-index="8"></div>
+                    <div class="black-key a-sharp piano-key" data-note-index="10"></div>
+                </div>
+
+                <!-- Gráfico de la escala -->
+                <div class="chart-container">
+                    <canvas id="scaleChart"></canvas>
+                </div>
+            `;
+
+            highlightPianoKeys(scaleNotesIndices);
+            setupPianoKeyListeners();
+            renderChart(scale.intervals, scale.name);
+        }
+
+        // Función para resaltar las teclas del piano
+        function highlightPianoKeys(scaleNotesIndices) {
+            document.querySelectorAll('.piano-key').forEach(key => {
+                key.classList.remove('key-highlight', 'key-root');
+                const noteIndex = parseInt(key.dataset.noteIndex);
+                if (scaleNotesIndices.includes(noteIndex)) {
+                    key.classList.add('key-highlight');
+                }
+                if (noteIndex === currentRootIndex) {
+                    key.classList.add('key-root');
+                }
+            });
+        }
+
+        // Función para configurar los oyentes de eventos en las teclas del piano
+        function setupPianoKeyListeners() {
+            document.querySelectorAll('.piano-key').forEach(key => {
+                key.onclick = () => {
+                    const noteIndex = parseInt(key.dataset.noteIndex);
+                    currentRootIndex = noteIndex;
+                    updateUI();
+                };
+            });
+        }
+
+        // Función para renderizar el gráfico
+        function renderChart(intervals, scaleName) {
+            const ctx = document.getElementById('scaleChart').getContext('2d');
+            
+            // Destruir el gráfico anterior si existe
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            const data = {
+                labels: intervals.map(i => `${i} semitonos`),
+                datasets: [{
+                    label: `Intervalos de la escala ${scaleName}`,
+                    data: intervals,
+                    backgroundColor: 'rgba(251, 191, 36, 0.6)',
+                    borderColor: '#FBBF24',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#DC2626'
+                }]
+            };
+
+            const options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        angleLines: {
+                            display: false
+                        },
+                        suggestedMin: 0,
+                        suggestedMax: 12,
+                        grid: {
+                            color: '#A8A29E'
+                        },
+                        ticks: {
+                            display: false
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Intervalo: ${context.raw} semitonos`;
+                            }
+                        }
+                    }
+                }
+            };
+
+            myChart = new Chart(ctx, {
+                type: 'radar',
+                data: data,
+                options: options
+            });
+        }
+
+        // Función principal para actualizar toda la interfaz de usuario
+        function updateUI() {
+            renderSidebar();
+            renderContent();
+        }
+
+        // Inicializar la aplicación
+        window.onload = function() {
+            updateUI();
+        };
+
+    </script>
+    <!-- Script de Adsterra insertado -->
     <script type='text/javascript' src='//pl27476455.profitableratecpm.com/9e/5d/df/9e5ddf0b21272652c5dddff61654b71d.js'></script>
 </body>
 </html>
